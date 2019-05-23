@@ -133,8 +133,7 @@ class ALPSNSignal(object):
 
 #t[s]	C[10^52/(MeV s)]	E0[MeV]	beta
     M40par = np.array([np.fromstring(f,dtype = np.float, count = 4, sep = '\t') \
-    for f in """0.1        0.18356234297932772        59.225788057998315        2.111893326954856
-0.1	0.6353432596108131	73.08660870147284	2.3275296098414566
+    for f in """0.1	0.6353432596108131	73.08660870147284	2.3275296098414566
 0.2	1.0463015461955407	92.67808980008974	2.1279233688774037
 0.30000000000000004	1.5100900207234378	106.65729701934445	2.0834378941074894
 0.4	1.9501281506240964	116.49892232157866	2.08067484280166
@@ -294,8 +293,8 @@ class ALPSNSignal(object):
 
     @Mprog.setter
     def Mprog(self, Mprog):
-        if not (Mprog == 10. or Mprog == 18.):
-            raise ValueError("Mprog must be either 10. or 18. solar masses")
+        if not (Mprog == 10. or Mprog == 18. or Mprog == 40.):
+            raise ValueError("Mprog must be either 10., 18., or 40. solar masses")
         self._Mprog = Mprog
         self.__set_interpolation()
         return 

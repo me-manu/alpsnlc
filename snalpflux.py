@@ -4,10 +4,10 @@ from astropy.cosmology import FlatLambdaCDM
 from scipy.integrate import simps
 import sys, os
 import numpy as np
-sys.path.append('/u/gl/mmeyer/projects/SNALPs/python/ALPsignal/')
-import calc_alp_signal as ca
+from .calc_alp_signal import ALPSNSignal
 import json
 from gammaALPs import Source, ALP, ModuleList
+
 
 class SNALPflux(object):
     """
@@ -46,7 +46,7 @@ class SNALPflux(object):
 
         # class to compute ALP flux 
         self._Mprog = Mprog
-        self._alp = ca.ALPSNSignal(Mprog=Mprog)
+        self._alp = ALPSNSignal(Mprog=Mprog)
 
         # constant to calculate flux:
         dl = self._cosmo.luminosity_distance(self._z)
@@ -63,7 +63,7 @@ class SNALPflux(object):
     @Mprog.setter
     def Mprog(self, Mprog):
         self._Mprog = Mprog
-        self._alp = ca.ALPSNSignal(Mprog=Mprog)
+        self._alp = ALPSNSignal(Mprog=Mprog)
 
     @property
     def cosmo(self):
