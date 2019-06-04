@@ -399,14 +399,14 @@ class GammaRayLogLike(object):
             cosmo = self._cosmo)
         self._set_refflux()
 
-    def _set_refflux(self, bfield = 'jansson12', t_sec = 20., g11 = 1.):
+    def _set_refflux(self, t_sec = 20., g11 = 1.):
         self.__t_sec = t_sec
         self.__g11 = g11
         self.__ref_flux = np.zeros_like(self._emax)
         for i,e in enumerate(self._emax):
             self.__ref_flux[i] = self._snalpflux.integrateGRayFlux(self._emin[i], e,
                             t_sec, g11,
-                            self._m_neV, bfield = bfield,
+                            self._m_neV, bfield = self._bfield,
                             esteps = 100, eflux = False)
 
     def flux2coupling(self,flux):
