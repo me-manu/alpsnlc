@@ -6,20 +6,9 @@ from os import path
 from fermiAnalysis.batchfarm.utils import init_logging, load, save
 from glob import glob
 from astropy.table import Table
-import myplot.funcs as mpf
-import copy
-from fermiAnalysis import bblocks
-from fermiAnalysis import hop
 from fermiAnalysis import adaptivebinning as ab
-from varFSRQ.fit_lc import FitLC, ExpFlare
-from varFSRQ import lcplots
-from scipy.stats import chi2
-from scipy.optimize import curve_fit
-from matplotlib.patheffects import withStroke
-import json
 import yaml
 from snlc.likelihood import GammaRayLogLike, CalcLimits
-from snlc.plotutils import LightcurvePlotter
 from fermiAnalysis.utils import myconf2fermipy,met_to_mjd
 from fermipy.gtanalysis import GTAnalysis
 from time import time

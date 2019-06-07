@@ -16,8 +16,6 @@ class TexpPost(object):
     """
     Class for marginzalized posterior of explosion time from MOSFIT fit 
     using the 'nester' sampler
-
-    TODO: implement smearing with delay
     """
     def __init__(self, walkerfile, min_delay = 0., max_delay = 0.):
         """
@@ -217,9 +215,6 @@ class TexpPost(object):
                 result[m] = self._pdf_conv((yy - tsts)[m].flatten() - self._texpref)
 
             return simps(result * ww, yy, axis = 0)
-
-
-
 
     def __call__(self, x):
         """
@@ -477,6 +472,46 @@ class GammaRayLogLike(object):
             ptpost[ptpost <= 1e-20] = np.ones(np.sum(ptpost <= 1e-20)) * 1e-20
             logl += np.log(ptpost)
         return logl, flux
+
+    def simulate_texp(self, size = 1, apply_obs_times = True):
+        """
+        Draw random explosion times from smeared explosion times
+
+        :param apply_obs_times:
+        bool, if True, only return times that lie within light curve intervals
+
+        :param size:
+        int, size of simulated array
+
+        :return:
+        texp_sim array-like, array with simulated explosion times
+
+        """
+        qs = np.random.rand(size)
+        if apply_obs_times:
+            # make a mask for texp times which is only true if
+            # texp is within time intervals of light curve
+            m = np.zeros(self.tpost.texp.size, dtype= np.bool)
+            for i, tmin in enumerate(self._tmin):
+                m = m | ((self.tpost.texp >= tmin) & (self.tpost.texp <= self._tmax[i]))
+            # recompute CDF with limited times
+            cdf = (np.cumsum(self.tpost._texp[m]) - np.cumsum(self.tpost._texp[m])[0]) / \
+                        (np.cumsum(self.tpost._texp[m])[-1] - np.cumsum(self.tpost._texp[m])[0])
+            # interpolate inverse
+            cdfinv = USpline(cdf[m], self.tpost._texp[m]), k = 1, s = 0, ext = 'const')
+            texp_sim = cdfinv(qs)
+
+            bins = np.empty((self._tmin.size + self._tmax.size,), dtype=self._tmax.dtype)
+            bins[0::2] = self._tmin
+            bins[1::2] = self._tmax
+
+            binnum = np.digitize(texp_sim, bins)
+            return texp_sim, binnum
+
+        else:
+            texp_sim = self.tpost.cdfinv(qs)
+
+            return texp_sim
 
 class CalcLimits(object):
     """Class to calculate limits, null distribution, etc."""
