@@ -24,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--snconf', required = True)
     parser.add_argument('--snmodel', default = 'default', required = True)
     parser.add_argument('--select_src', required = False, default = 'none')
+    parser.add_argument('--isrcstart', required = False, type = int)
     parser.add_argument('--interval',
         #choices = ['weekly','daily','orbit','5min','3min'],
         default = 'weekly', help='time interval')
@@ -34,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite', help = "overwrite existing file", type = int, default = 0)
     parser.add_argument('--nsamples', help = "number of samples to build null distribution",
         type = int, default = 10)
+    parser.add_argument('--seed', help = "random seed", type = int)
     parser.add_argument('--bfield', help = "Assumed B field", default = 'jansson12')
     args = parser.parse_args()
     src = SrcList(args.srcconf, args.conf, interval = args.interval, usehop = False)
@@ -42,14 +44,18 @@ if __name__ == '__main__':
 
     source_names = list(src.srcconf.keys())
 
+    if args.seed is not None:
+        np.random.seed(args.seed)
     # photon ALP coupling array
-    g11 = np.logspace(-2.,1.5,3*20 + 10 + 1)
+    g11sim = np.logspace(-2.,1.5,3*40 + 20 + 1)
+    g11obs = np.logspace(-2.,1.5,3*200 + 100 + 1)
+    #g11 = np.logspace(-2.,1.5,601)
 
     # ALP mass array
     m_neV = np.logspace(np.log10(args.m_neV_start),
                 np.log10(args.m_neV_stop), args.m_neV_step)
     logging.info("tested ALP masses: {0}".format(m_neV))
-    logging.debug("tested ALP coupling: {0}".format(g11))
+    logging.debug("tested ALP coupling obs: {0}".format(g11obs))
 
     with open(args.snconf) as f:
         snconfig = yaml.load(f)
@@ -58,6 +64,9 @@ if __name__ == '__main__':
     for isrc,s in enumerate(source_names):
         if not args.select_src.lower() == 'none': 
             if not s.lower() == args.select_src.lower(): continue
+
+        if args.isrcstart is not None:
+            if isrc < args.isrcstart: continue
 
         for i in range(len(src.srcconf[s])):
 
@@ -170,30 +179,41 @@ if __name__ == '__main__':
             logging.info("Probability to observe {0:s}: {1:.4f}".format(s, pobs))
 
             cl = CalcLimits(gloglike)
-            q = 0.99
+            q = 0.95
             mdata = CalcLimits.calcmask(gloglike, q = q)
             if mdata.sum():
                 t0 = time()
 
                 gband = np.zeros((m_neV.size,5))
-                logl = np.zeros((m_neV.size, args.nsamples, g11.size))
+                logl = []
 
-                logldata = np.zeros((m_neV.size, g11.size))
-                glimdata = np.zeros_like(m_neV)
+                logldata = np.zeros((m_neV.size, g11obs.size))
+                glimdata = np.zeros((m_neV.size, 3))
+                lcbin_recon = np.zeros(m_neV.size)
 
-                logldata[0], tsdata, glimdata[0] = CalcLimits.calc_obs_limits(gloglike,g11 = g11)
-                logl[0], ts, gband[0], q = cl.build_null_dist_exp_bands(g11, samples = args.nsamples)
+                logldata[0], tsdata, glimdata[0], lcbin_recon[0], nbins  = CalcLimits.calc_obs_limits(gloglike,
+                                            g11 = g11obs, best_time = 'maxts', q = q, cl = 0.95, seed = args.seed)
+
+                l, ts, gband[0], qband = cl.build_null_dist_exp_bands(g11sim, samples = args.nsamples,
+                                                                    best_time = 'maxts', q = q, cl = 0.95, seed = args.seed)
+                logl.append(l)
 
                 for imass, m in enumerate(m_neV[1:]):
                     logging.info(" ==== Calculating mass {0:n} / {1:n}: {2:.2f} neV".format(
                                     imass + 1, m_neV.size - 1, m))
                     cl.glnl.m_neV = m
-                    logl[imass + 1], ts, gband[imass + 1], q = cl.build_null_dist_exp_bands(g11 = g11, samples = args.nsamples)
-                    logldata[imass + 1], tsdata, glimdata[imass + 1] = cl.calc_obs_limits(cl.glnl, g11 = g11)
 
-                np.savez(filename, q = q, m_neV = m_neV, Mprog = args.Mprog, snmodel = args.snmodel,
+                    l, _, gband[imass + 1], _ = cl.build_null_dist_exp_bands(g11 = g11sim, samples = args.nsamples, seed = args.seed,
+                                                                                            best_time = 'maxts', q = q, cl = 0.95)
+                    logl.append(l)
+
+                    logldata[imass + 1], tsdata, glimdata[imass + 1], lcbin_recon[imass + 1], _ = cl.calc_obs_limits(cl.glnl,
+                                                            g11 = g11obs, best_time = 'maxts', q = q, cl = 0.95, seed = args.seed)
+
+                np.savez(filename, qband = qband, q = q, m_neV = m_neV, Mprog = args.Mprog, snmodel = args.snmodel,
                         ts = ts, gband = gband, pobs = pobs, max_delay = snconfig.get('max_delay',0.),
-                        min_delay = snconfig.get('min_delay',0.), logl = logl, g11 = g11,
+                        min_delay = snconfig.get('min_delay',0.), logl = logl, g11sim = g11sim, g11obs = g11obs,
+                        lcbin_recon = lcbin_recon, nbins = nbins, 
                         logldata = logldata, tsdata = tsdata, glimdata = glimdata)
                 logging.info("saved bands and ts distribution to {0:s}".format(filename))
 

@@ -157,7 +157,7 @@ class SNALPflux(object):
             pin = np.diag([0.,0.,1.]), EGeV = EMeV / 1000.)
         m.add_propagation("GMF",0, model = bfield)
         px,py,pa = m.run()
-        return px + py
+        return np.squeeze(px + py)
 
     def integrateGRayFlux(self, emin, emax, t_sec, g11, m_neV, bfield = 'jansson12', esteps = 100, eflux = False):
         """
@@ -208,3 +208,45 @@ class SNALPflux(object):
             return simps(flux * EMeV_array * EMeV_array, np.log(EMeV_array))
         else:
             return simps(flux * EMeV_array, np.log(EMeV_array))
+
+    def dnde_gray(self, EMeV, t_sec, g11, m_neV, bfield = 'jansson12'):
+        """
+        Calculate dN/dE of gamma-rays
+        averaged over some time 
+
+        Parameters
+        ----------
+        EMeV: array-like
+            Energies in MeV
+
+        t_sec: float  
+            time range in seconds over which 
+            the spectrum should be averaged.
+
+        g11: float
+            ALP coupling in 10^-11 GeV-1 
+
+        m_neV: float
+            ALP mass in neV
+
+        {options}
+
+        bfield: str
+            identifier for Milky Way magnetic field. default: 'jansson12'
+
+        esteps: int
+            number of integration steps in energy. default: 100
+
+        eflux: bool 
+            if True, calculate energy flux. Default: False
+
+        Returns
+        -------
+        flux (or energy flux) in units of gamma-rays (MeV) / s / cm2
+        """
+
+        dna_dedt = self.AvgALPflux(EMeV, t_sec, g11) # alps / MeV / s 
+        pag = self.Pag(EMeV, g11, m_neV, bfield = bfield) # conversion prob
+        dng_dedt = dna_dedt * pag # gamma rays / MeV / s 
+        flux = dng_dedt * self.fluxconstant # gamma rays / MeV / s / cm^2
+        return flux
