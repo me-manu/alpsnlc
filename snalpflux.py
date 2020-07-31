@@ -14,15 +14,25 @@ class SNALPflux(object):
     Class for calculating ALP and gamma-ray flux from a supernova
     using the 'nester' sampler
     """
-    def __init__(self, walkerfile,Mprog = 10.,
+    def __init__(self, walkerfile=None,ra=None, dec=None, Mprog = 10., z = None,
             cosmo = FlatLambdaCDM(H0=0.7 * 100. * u.km / u.s / u.Mpc, Tcmb0=2.725 * u.K, Om0=0.3)):
         """
         Init the class
 
         Parameters
         ----------
-        walkerfile: str
+        walkerfile: str or None
             path to MOSFIT results file which contains the walkers
+            if None, ra, dec, and z have to be provided
+
+        ra: str or None
+            Right Ascension as string in degrees
+
+        dec: str or None
+            Declination as string in degrees
+
+        z: float or None
+            Redshift
 
         {options}
 
@@ -33,14 +43,20 @@ class SNALPflux(object):
         cosmo: `astropy.cosmology.FlatLambdaCDM`
             the chosen cosmology. Default: 737
         """
-        with open(walkerfile, 'r') as f:
-            data = json.loads(f.read())
-        if 'name' not in data:
-            data = data[list(data.keys())[0]]
+        if walkerfile is not None:
+            with open(walkerfile, 'r') as f:
+                data = json.loads(f.read())
+            if 'name' not in data:
+                data = data[list(data.keys())[0]]
+            self._c = SkyCoord(ra = data['ra'][0]['value'], dec = data['dec'][0]['value'], unit = (u.hourangle, u.deg))
+            self._z =  np.mean([float(data['redshift'][i]['value']) for i in range(len(data['redshift']))])
+        else:
+            if ra is None or dec is None or z is None:
+                raise ValueError("No walkerfile given and no ra and dec provided!")
+            self._c = SkyCoord(ra = ra, dec = dec, unit = (u.deg, u.deg))
+            self._z = z
 
         # SN coordinates
-        self._c = SkyCoord(ra = data['ra'][0]['value'], dec = data['dec'][0]['value'], unit = (u.hourangle, u.deg))
-        self._z =  np.mean([float(data['redshift'][i]['value']) for i in range(len(data['redshift']))])
         self._src = Source(z = self._z, ra = float(self._c.ra.value), dec = float(self._c.dec.value))
         self._cosmo = cosmo
 
@@ -72,6 +88,16 @@ class SNALPflux(object):
     @property
     def lumidist(self):
         return self._cosmo.luminosity_distance(self._z)
+
+    @property
+    def z(self):
+        return self._z
+
+    @z.setter
+    def z(self, z):
+        self._z = z
+        dl = self._cosmo.luminosity_distance(self._z)
+        self.fluxconstant = 1. / 4. / np.pi / dl.to('cm').value ** 2.
  
 
     @cosmo.setter
@@ -99,7 +125,7 @@ class SNALPflux(object):
         -------
         nxm dim array with ALP flux in units of MeV-1 s-1
         """
-        na_dedt = self._alp(EMeV=EMeV, ts = t_sec, g10 = g11 * 10.) # alp spectrum per energy and time
+        na_dedt = self._alp(EMeV=EMeV, ts = t_sec, g10 = g11 * 0.1) # alp spectrum per energy and time
         return na_dedt * 1.e52
 
     def AvgALPflux(self, EMeV, t_sec, g11):
